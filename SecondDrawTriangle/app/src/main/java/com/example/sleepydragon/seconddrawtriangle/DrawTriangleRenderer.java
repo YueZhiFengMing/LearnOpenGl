@@ -98,6 +98,7 @@ public class DrawTriangleRenderer implements GLSurfaceView.Renderer {
                 false, 0,mVertexData);
 
         glEnableVertexAttribArray(aPositionLocation);
+        glUniform4f(uColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);
 
     }
 
@@ -111,7 +112,6 @@ public class DrawTriangleRenderer implements GLSurfaceView.Renderer {
 
         glClear(GL_COLOR_BUFFER_BIT);
         // Draw the table.
-        glUniform4f(uColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);
         glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 
