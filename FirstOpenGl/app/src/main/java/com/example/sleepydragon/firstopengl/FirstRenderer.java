@@ -14,10 +14,11 @@ public class FirstRenderer implements GLSurfaceView.Renderer {
 
     private static final String TAG = "FirstRenderer";
 
+
+
     @Override
     public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
         glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
     }
 
     @Override
@@ -27,7 +28,7 @@ public class FirstRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 glUnused) {
-
+        glClear(GL_COLOR_BUFFER_BIT);
     }
 
 }
