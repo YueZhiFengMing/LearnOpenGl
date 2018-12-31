@@ -63,7 +63,7 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
 
 
     private float[] mTrianglePoints =
-            {       0.0f, 0.5f, 0.0f,
+            {0.0f, 0.5f, 0.0f,
                     0.0f, 0.0f, 0.5f,
                     0.5f, 0.0f, 0.0f,
                     -0.25f, 0.0f, -0.25f,
@@ -158,9 +158,14 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
         multiplyMM(mMVPMatrix, 0, projectionMatrix, 0, modelMatrix, 0);
     }
 
+    private void updateAngle() {
+        rotateM(modelMatrix, 0, (float) 1.0, 0f, 1f, 0f);
+        multiplyMM(mMVPMatrix, 0, projectionMatrix, 0, modelMatrix, 0);
+    }
+
     @Override
     public void onDrawFrame(GL10 glUnused) {
-
+        updateAngle();
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Assign the matrix
