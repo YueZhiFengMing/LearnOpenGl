@@ -16,7 +16,7 @@ import static android.opengl.GLES20.GL_COMPILE_STATUS;
 import static android.opengl.GLES20.GL_FLOAT;
 import static android.opengl.GLES20.GL_FRAGMENT_SHADER;
 import static android.opengl.GLES20.GL_LINK_STATUS;
-import static android.opengl.GLES20.GL_TRIANGLES;
+import static android.opengl.GLES20.GL_TRIANGLE_STRIP;
 import static android.opengl.GLES20.GL_VERTEX_SHADER;
 import static android.opengl.GLES20.glAttachShader;
 import static android.opengl.GLES20.glClear;
@@ -36,7 +36,6 @@ import static android.opengl.GLES20.glGetShaderiv;
 import static android.opengl.GLES20.glGetUniformLocation;
 import static android.opengl.GLES20.glLinkProgram;
 import static android.opengl.GLES20.glShaderSource;
-import static android.opengl.GLES20.glUniform4f;
 import static android.opengl.GLES20.glUniformMatrix4fv;
 import static android.opengl.GLES20.glUseProgram;
 import static android.opengl.GLES20.glVertexAttribPointer;
@@ -51,9 +50,10 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
     private static final String TAG = "FirstRenderer";
     private static final int BYTES_PER_FLOAT = 4;
     private final FloatBuffer mVertexData;
+    private final FloatBuffer mColorData;
     private int mShaderProgram;
 
-    private int uColorLocation;
+    private int aColorLocation;
     private int aPositionLocation;
     private int uMatrixLocation;
 
@@ -62,20 +62,36 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
     private final float[] mMVPMatrix = new float[16];
 
 
-    private float[] mTrianglePoints = {-0.5f, -0.5f, 0.5f, -0.5f, 0f, 0.5f};
+    private float[] mTrianglePoints =
+            {       0.0f, 0.5f, 0.0f,
+                    0.0f, 0.0f, 0.5f,
+                    0.5f, 0.0f, 0.0f,
+                    -0.25f, 0.0f, -0.25f,
+                    0.0f, 0.5f, 0.0f,
+                    0.0f, 0.0f, 0.5f};
+    private float[] mColorPoints =
+            {1.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f,
+                    0.5f, 0.5f, 0.5f,
+                    1.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f,};
     private String mVertexShaderCode =
             "uniform mat4 u_Matrix;        \n" +
                     "attribute vec4 a_Position;     \n" +
+                    "attribute vec4 a_Color;     \n" +
+                    "varying vec4 v_Color;     \n" +
                     "void main()                    \n" +
                     "{                              \n" +
+                    "    v_Color =  a_Color;  \n" +
                     "    gl_Position =  u_Matrix * a_Position;  \n" +
                     "}   \n";
     private String mFragmentShaderCode =
             "precision mediump float; \n" +
-                    "uniform vec4 u_Color;          \n" +
+                    "varying vec4 v_Color;     \n" +
                     "void main()                    \n" +
                     "{                              \n" +
-                    "    gl_FragColor = u_Color;    \n" +
+                    "    gl_FragColor = v_Color;    \n" +
                     "}";
 
     RotateTriangleRenderer() {
@@ -85,11 +101,17 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
                 .asFloatBuffer();
 
         mVertexData.put(mTrianglePoints);
+
+        mColorData = ByteBuffer
+                .allocateDirect(mColorPoints.length * BYTES_PER_FLOAT)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer();
+        mColorData.put(mColorPoints);
     }
 
     @Override
     public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
-        glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
         //create vertex shader
         int vertexShader = compileShader(GL_VERTEX_SHADER, mVertexShaderCode);
@@ -100,7 +122,7 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
         //use this program
         glUseProgram(mShaderProgram);
 
-        uColorLocation = glGetUniformLocation(mShaderProgram, "u_Color");
+        aColorLocation = glGetAttribLocation(mShaderProgram, "a_Color");
 
         aPositionLocation = glGetAttribLocation(mShaderProgram, "a_Position");
 
@@ -109,24 +131,28 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
         // Bind our data, specified by the variable vertexData, to the vertex
         // attribute at location A_POSITION_LOCATION.
         mVertexData.position(0);
-        glVertexAttribPointer(aPositionLocation, 2, GL_FLOAT,
+        glVertexAttribPointer(aPositionLocation, 3, GL_FLOAT,
                 false, 0, mVertexData);
-
         glEnableVertexAttribArray(aPositionLocation);
-        glUniform4f(uColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);
+
+        mColorData.position(0);
+        glVertexAttribPointer(aColorLocation, 3, GL_FLOAT,
+                false, 0, mColorData);
+        glEnableVertexAttribArray(aColorLocation);
 
     }
 
     @Override
     public void onSurfaceChanged(GL10 glUnused, int width, int height) {
         glViewport(0, 0, width, height);
-        Matrix.perspectiveM(projectionMatrix, 0,45, (float) width
-                / (float) height,  1f,10f);
+        Matrix.perspectiveM(projectionMatrix, 0, 45, (float) width
+                / (float) height, 1f, 10f);
 
         setIdentityM(modelMatrix, 0);
 
         translateM(modelMatrix, 0, 0f, 0f, -2.5f);
-//        rotateM(modelMatrix, 0, -60f, 1f, 0f, 0f);
+        rotateM(modelMatrix, 0, 20f, 1f, 0f, 0f);
+//        rotateM(modelMatrix, 0, -10f, 0f, 1f, 0f);
 //        rotateM(modelMatrix, 0, -60f, 0f, 0f, 1f);
 
         multiplyMM(mMVPMatrix, 0, projectionMatrix, 0, modelMatrix, 0);
@@ -140,7 +166,7 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
         // Assign the matrix
         glUniformMatrix4fv(uMatrixLocation, 1, false, mMVPMatrix, 0);
         // Draw the table.
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
     }
 
 
