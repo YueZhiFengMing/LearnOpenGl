@@ -40,10 +40,12 @@ import static android.opengl.GLES20.glUniformMatrix4fv;
 import static android.opengl.GLES20.glUseProgram;
 import static android.opengl.GLES20.glVertexAttribPointer;
 import static android.opengl.GLES20.glViewport;
+import static android.opengl.Matrix.invertM;
 import static android.opengl.Matrix.multiplyMM;
+import static android.opengl.Matrix.multiplyMV;
 import static android.opengl.Matrix.rotateM;
 import static android.opengl.Matrix.setIdentityM;
-import static android.opengl.Matrix.translateM;
+import static android.opengl.Matrix.setLookAtM;
 
 public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
 
@@ -59,23 +61,36 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
 
     private final float[] modelMatrix = new float[16];
     private final float[] projectionMatrix = new float[16];
+    private final float[] viewMatrix = new float[16];
+    private final float[] viewProjectionMatrix = new float[16];
+    private final float[] invertedViewProjectionMatrix = new float[16];
     private final float[] mMVPMatrix = new float[16];
+
+    private volatile boolean mIsPressed;
 
 
     private float[] mTrianglePoints =
-            {0.0f, 0.5f, 0.0f,
-                    0.0f, 0.0f, 0.5f,
-                    0.5f, 0.0f, 0.0f,
-                    -0.25f, 0.0f, -0.25f,
-                    0.0f, 0.5f, 0.0f,
-                    0.0f, 0.0f, 0.5f};
+            {0.5f, 0.5f, 0.5f,
+                    0.5f, -0.5f, 0.5f,
+                    0.5f, 0.5f, -0.5f,
+                    0.5f, -0.5f, -0.5f,
+                    -0.5f, 0.5f, -0.5f,
+                    -0.5f, -0.5f, -0.5f,
+                    -0.5f, 0.5f, 0.5f,
+                    -0.5f, -0.5f, 0.5f,
+                    0.5f, 0.5f, 0.5f,
+                    0.5f, -0.5f, 0.5f};
     private float[] mColorPoints =
             {1.0f, 0.0f, 0.0f,
+                    1.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f,
                     0.0f, 1.0f, 0.0f,
                     0.0f, 0.0f, 1.0f,
+                    0.0f, 0.0f, 1.0f,
+                    0.5f, 0.5f, 0.5f,
                     0.5f, 0.5f, 0.5f,
                     1.0f, 0.0f, 0.0f,
-                    0.0f, 1.0f, 0.0f,};
+                    1.0f, 0.0f, 0.0f};
     private String mVertexShaderCode =
             "uniform mat4 u_Matrix;        \n" +
                     "attribute vec4 a_Position;     \n" +
@@ -95,6 +110,9 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
                     "}";
 
     RotateTriangleRenderer() {
+        for (int i = 0; i < mTrianglePoints.length; i++) {
+            mTrianglePoints[i] /= 5f;
+        }
         mVertexData = ByteBuffer
                 .allocateDirect(mTrianglePoints.length * BYTES_PER_FLOAT)
                 .order(ByteOrder.nativeOrder())
@@ -147,31 +165,44 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
         glViewport(0, 0, width, height);
         Matrix.perspectiveM(projectionMatrix, 0, 45, (float) width
                 / (float) height, 1f, 10f);
+        setLookAtM(viewMatrix, 0, 0f, 1.2f, 2.2f, 0f, 0f, 0f, 0f, 1f, 0f);
 
         setIdentityM(modelMatrix, 0);
-
-        translateM(modelMatrix, 0, 0f, 0f, -2.5f);
-        rotateM(modelMatrix, 0, 20f, 1f, 0f, 0f);
+//        translateM(modelMatrix, 0, 0f, 0f, -2.5f);
+//        rotateM(modelMatrix, 0, 20f, 1f, 0f, 0f);
 //        rotateM(modelMatrix, 0, -10f, 0f, 1f, 0f);
 //        rotateM(modelMatrix, 0, -60f, 0f, 0f, 1f);
-
-        multiplyMM(mMVPMatrix, 0, projectionMatrix, 0, modelMatrix, 0);
+//        invertM(invertedViewProjectionMatrix, 0, projectionMatrix, 0);
     }
 
     private void updateAngle() {
-        rotateM(modelMatrix, 0, (float) 1.0, 0f, 1f, 0f);
-        multiplyMM(mMVPMatrix, 0, projectionMatrix, 0, modelMatrix, 0);
+        if (!mIsPressed) {
+            rotateM(modelMatrix, 0, (float) 1.0, 0f, 1f, 0f);
+            multiplyMM(viewProjectionMatrix, 0, projectionMatrix, 0,
+                    viewMatrix, 0);
+            multiplyMM(mMVPMatrix, 0, viewProjectionMatrix,
+                    0, modelMatrix, 0);
+        }
     }
 
     @Override
     public void onDrawFrame(GL10 glUnused) {
         updateAngle();
+        // Update the viewProjection matrix, and create an inverted matrix for
+        // touch picking.
+        multiplyMM(viewProjectionMatrix, 0, projectionMatrix, 0,
+                viewMatrix, 0);
+
+        multiplyMM(mMVPMatrix, 0, viewProjectionMatrix,
+                0, modelMatrix, 0);
+
+        invertM(invertedViewProjectionMatrix, 0, viewProjectionMatrix, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Assign the matrix
         glUniformMatrix4fv(uMatrixLocation, 1, false, mMVPMatrix, 0);
         // Draw the table.
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 10);
     }
 
 
@@ -254,6 +285,75 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
 
         // Return the program object ID.
         return programObjectId;
+    }
+
+    private void divideByW(float[] vector) {
+        vector[0] /= vector[3];
+        vector[1] /= vector[3];
+        vector[2] /= vector[3];
+    }
+
+    private Geometry.Ray convertNormalized2DPointToRay(
+            float normalizedX, float normalizedY) {
+        // We'll convert these normalized device coordinates into world-space
+        // coordinates. We'll pick a point on the near and far planes, and draw a
+        // line between them. To do this transform, we need to first multiply by
+        // the inverse matrix, and then we need to undo the perspective divide.
+        final float[] nearPointNdc = {normalizedX, normalizedY, -1, 1};
+        final float[] farPointNdc = {normalizedX, normalizedY, 1, 1};
+
+        final float[] nearPointWorld = new float[4];
+        final float[] farPointWorld = new float[4];
+
+        multiplyMV(
+                nearPointWorld, 0, invertedViewProjectionMatrix, 0, nearPointNdc, 0);
+        multiplyMV(
+                farPointWorld, 0, invertedViewProjectionMatrix, 0, farPointNdc, 0);
+
+        // Why are we dividing by W? We multiplied our vector by an inverse
+        // matrix, so the W value that we end up is actually the *inverse* of
+        // what the projection matrix would create. By dividing all 3 components
+        // by W, we effectively undo the hardware perspective divide.
+        divideByW(nearPointWorld);
+        divideByW(farPointWorld);
+
+        // We don't care about the W value anymore, because our points are now
+        // in world coordinates.
+        Geometry.Point nearPointRay =
+                new Geometry.Point(nearPointWorld[0], nearPointWorld[1], nearPointWorld[2]);
+
+        Geometry.Point farPointRay =
+                new Geometry.Point(farPointWorld[0], farPointWorld[1], farPointWorld[2]);
+
+        return new Geometry.Ray(nearPointRay,
+                Geometry.vectorBetween(nearPointRay, farPointRay));
+    }
+
+    public void handleTouchPress(float normalizedX, float normalizedY) {
+        Log.e(TAG, "normalizedX " + normalizedX + " normalizedY " + normalizedY);
+        Geometry.Ray ray = convertNormalized2DPointToRay(normalizedX, normalizedY);
+        Log.e(TAG, "ray " + ray.toString());
+
+        // Now test if this ray intersects with the mallet by creating a
+        // bounding sphere that wraps the mallet.
+        Geometry.Sphere malletBoundingSphere = new Geometry.Sphere(new Geometry.Point(
+                0F,
+                0F,
+                0F),
+                0.1F);
+
+        // If the ray intersects (if the user touched a part of the screen that
+        // intersects the mallet's bounding sphere), then set malletPressed =
+        // true.
+        mIsPressed = Geometry.intersects(malletBoundingSphere, ray);
+    }
+
+    public void handleTouchDown(float normalizedX, float normalizedY) {
+        handleTouchPress(normalizedX, normalizedY);
+    }
+
+    public void handleTouchUp(float normalizedX, float normalizedY) {
+        mIsPressed = false;
     }
 }
 

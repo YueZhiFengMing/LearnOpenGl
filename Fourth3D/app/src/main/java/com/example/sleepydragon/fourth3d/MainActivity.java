@@ -1,5 +1,6 @@
 package com.example.sleepydragon.fourth3d;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
@@ -7,6 +8,8 @@ import android.content.pm.ConfigurationInfo;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.MotionEvent;
+import android.view.View;
 import android.widget.Toast;
 
 public class MainActivity extends Activity {
@@ -16,10 +19,50 @@ public class MainActivity extends Activity {
     private GLSurfaceView glSurfaceView;
     private boolean rendererSet = false;
 
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         glSurfaceView = new GLSurfaceView(this);
+        final RotateTriangleRenderer renderer = new RotateTriangleRenderer();
+        glSurfaceView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent motionEvent) {
+                if(motionEvent!=null){
+                    final float normalizedX =
+                            (motionEvent.getX()/(float)view.getWidth())*2-1;
+                    final float normalizedY =
+                            -((motionEvent.getY()/(float)view.getHeight())*2-1);
+                    if(motionEvent.getAction()==MotionEvent.ACTION_DOWN){
+                        glSurfaceView.queueEvent(new Runnable() {
+                            @Override
+                            public void run() {
+                                renderer.handleTouchDown(normalizedX,normalizedY);
+                            }
+                        });
+                        return true;
+                    }else if(motionEvent.getAction()==MotionEvent.ACTION_BUTTON_PRESS){
+                        glSurfaceView.queueEvent(new Runnable() {
+                            @Override
+                            public void run() {
+                                renderer.handleTouchPress(normalizedX,normalizedX);
+                            }
+                        });
+                        return true;
+                    }else if(motionEvent.getAction()==MotionEvent.ACTION_UP){
+                        glSurfaceView.queueEvent(new Runnable() {
+                            @Override
+                            public void run() {
+                                renderer.handleTouchUp(normalizedX,normalizedX);
+                            }
+                        });
+                        return true;
+                    }
+                    return false;
+                }
+                return false;
+            }
+        });
 
         // Check if the system supports OpenGL ES 2.0.
         final ActivityManager activityManager =
@@ -48,7 +91,7 @@ public class MainActivity extends Activity {
         if (supportsEs2) {
             // Request an OpenGL ES 2.0 compatible context.
             glSurfaceView.setEGLContextClientVersion(2);
-            glSurfaceView.setRenderer(new RotateTriangleRenderer());
+            glSurfaceView.setRenderer(renderer);
             rendererSet = true;
         } else {
             /*
