@@ -1,5 +1,6 @@
 package com.example.sleepydragon.fourth3d;
 
+import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.util.Log;
@@ -7,18 +8,24 @@ import android.util.Log;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.ShortBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+import static android.opengl.GLES20.GL_ARRAY_BUFFER;
 import static android.opengl.GLES20.GL_COLOR_BUFFER_BIT;
 import static android.opengl.GLES20.GL_COMPILE_STATUS;
+import static android.opengl.GLES20.GL_ELEMENT_ARRAY_BUFFER;
 import static android.opengl.GLES20.GL_FLOAT;
 import static android.opengl.GLES20.GL_FRAGMENT_SHADER;
 import static android.opengl.GLES20.GL_LINK_STATUS;
+import static android.opengl.GLES20.GL_STATIC_DRAW;
 import static android.opengl.GLES20.GL_TRIANGLE_STRIP;
 import static android.opengl.GLES20.GL_VERTEX_SHADER;
 import static android.opengl.GLES20.glAttachShader;
+import static android.opengl.GLES20.glBindBuffer;
+import static android.opengl.GLES20.glBufferData;
 import static android.opengl.GLES20.glClear;
 import static android.opengl.GLES20.glClearColor;
 import static android.opengl.GLES20.glCompileShader;
@@ -28,6 +35,7 @@ import static android.opengl.GLES20.glDeleteProgram;
 import static android.opengl.GLES20.glDeleteShader;
 import static android.opengl.GLES20.glDrawArrays;
 import static android.opengl.GLES20.glEnableVertexAttribArray;
+import static android.opengl.GLES20.glGenBuffers;
 import static android.opengl.GLES20.glGetAttribLocation;
 import static android.opengl.GLES20.glGetProgramInfoLog;
 import static android.opengl.GLES20.glGetProgramiv;
@@ -67,6 +75,8 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
     private final float[] mMVPMatrix = new float[16];
 
     private volatile boolean mIsPressed;
+
+    private int mVboBufferId;
 
 
     private float[] mTrianglePoints =
@@ -149,9 +159,14 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
         // Bind our data, specified by the variable vertexData, to the vertex
         // attribute at location A_POSITION_LOCATION.
         mVertexData.position(0);
+        initVBO();
+        glBindBuffer(GL_ARRAY_BUFFER,mVboBufferId);
         glVertexAttribPointer(aPositionLocation, 3, GL_FLOAT,
-                false, 0, mVertexData);
+                false, 3*BYTES_PER_FLOAT, 0);
+//        glVertexAttribPointer(aPositionLocation, 3, GL_FLOAT,
+//                false, 0, mVertexData);
         glEnableVertexAttribArray(aPositionLocation);
+        glBindBuffer(GL_ARRAY_BUFFER,0);
 
         mColorData.position(0);
         glVertexAttribPointer(aColorLocation, 3, GL_FLOAT,
@@ -354,6 +369,30 @@ public class RotateTriangleRenderer implements GLSurfaceView.Renderer {
 
     public void handleTouchUp(float normalizedX, float normalizedY) {
         mIsPressed = false;
+    }
+
+    private void initVBO(){
+        // Allocate a buffer.
+        final int buffers[] = new int[1];
+        glGenBuffers(buffers.length, buffers, 0);
+
+        if (buffers[0] == 0) {
+            throw new RuntimeException("Could not create a new index buffer object.");
+        }
+
+        mVboBufferId = buffers[0];
+
+        // Bind to the buffer.
+        glBindBuffer(GLES20.GL_ARRAY_BUFFER, buffers[0]);
+
+        // Transfer data from native memory to the GPU buffer.
+        glBufferData(GL_ARRAY_BUFFER,mVertexData.capacity()*BYTES_PER_FLOAT,mVertexData,GL_STATIC_DRAW);
+
+        // IMPORTANT: Unbind from the buffer when we're done with it.
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // We let the native buffer go out of scope, but it won't be released
+        // until the next time the garbage collector is run.
     }
 }
 
